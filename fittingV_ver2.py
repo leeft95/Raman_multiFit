@@ -162,13 +162,154 @@ class Multi_fit():
         
         return compound_x,compound_y,peak1_x,peak1_fit.best_fit,peak2_x,peak2_fit.best_fit,total_area,area_1,area_2,ratio
             
+           
+    def peaks_3(self):  
+        
+        widths=np.arange(1,self.width, 0.01)
+        
+        smooth_indexes_scipy = scipy.signal.find_peaks_cwt(self.y, widths)
+        peak_indexes_xs_ys = np.asarray([list(a) for a in list(zip(self.x[smooth_indexes_scipy], self.y[smooth_indexes_scipy]))])
+        high_peak = sorted(peak_indexes_xs_ys, key=lambda pair: pair[1])[-self.num_peaks:]
+        print('\n' + str(high_peak[-1][0]) + '\n')
+        #print(peak_indexes_xs_ys)
+        print(high_peak)
+
+        fit_X = []
+        fit_Y = []
+        fit_XX = []
+        fit_YY = []
+        
+        fit_range1 = 80
+        
+        for i in range(len(self.x)):
+            if self.x[i] > high_peak[-1][0]-fit_range1 and self.x[i] < high_peak[-1][0]+fit_range1:
+                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
+                fit_XX.append(self.x[i])
+                fit_YY.append(x)
+                
+        fit_XX = np.asarray(fit_XX)
+        fit_YY = np.asarray(fit_YY)
+        
+        smooth_indexes_scipy = scipy.signal.find_peaks_cwt(fit_YY, widths)
+        peak_indexes_xs_ys = np.asarray([list(a) for a in list(zip(fit_XX[smooth_indexes_scipy], fit_YY[smooth_indexes_scipy]))])
+        high_peak1 = sorted(peak_indexes_xs_ys, key=lambda pair: pair[1])[-2:]
+        print('\n' + str(high_peak[-1][0]) + '\n')
+        print(peak_indexes_xs_ys)
+        print(high_peak1)
+                
+        fit_range2 = 250
             
+        for i in range(len(self.x)):
+            if self.x[i] > high_peak[-1][0]-fit_range2 and self.x[i] < high_peak[-1][0]+fit_range2:
+                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
+                fit_X.append(self.y)
+                fit_Y.append(x)
+        
+        fit_X = np.asarray(fit_X)
+        fit_Y = np.asarray(fit_Y)
+        
+        plt.figure()
+        plt.plot(fit_X,fit_Y)
+        plt.show()
+
+
+
+#        smooth_indexes_scipy = scipy.signal.find_peaks_cwt(fit_Y, widths)
+#        peak_indexes_xs_ys = np.asarray([list(a) for a in list(zip(fit_X[smooth_indexes_scipy], fit_Y[smooth_indexes_scipy]))])
+#        high_peak = sorted(peak_indexes_xs_ys, key=lambda pair: pair[1])[-n:]
+#        
+#        print(high_peak)
+#        print('\n' + str(high_peak[-1][0]) + '\n')
+        
+        
+        fit_X_p1 = []
+        fit_Y_p1 = []
+        
+        fit_X_p2 = []
+        fit_Y_p2 = []
+        
+        fit_X_p3 = []
+        fit_Y_p3 = []                    
+        
+        for i in range(len(self.x)):
+            if self.x[i] > high_peak1[-1][0]-15 and self.x[i] < high_peak1[-1][0]+15:
+                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
+                fit_X_p1.append(self.x[i])
+                fit_Y_p1.append(x)
+            if self.x[i] > high_peak[0][0]-15 and self.x[i] < high_peak[0][0]+15:
+                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
+                fit_X_p2.append(self.x[i])
+                fit_Y_p2.append(x)
+            if self.x[i] > high_peak1[0][0]-15 and self.x[i] < high_peak1[0][0]+15:
+                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
+                fit_X_p3.append(self.x[i])
+                fit_Y_p3.append(x)
+            #return fit_X, fit _Y
+        
+        fit_X_p1 = np.asarray(fit_X_p1)
+        fit_Y_p1 = np.asarray(fit_Y_p1)
+        
+        fit_X_p2 = np.asarray(fit_X_p2)
+        fit_Y_p2 = np.asarray(fit_Y_p2)
+
+        fit_X_p3 = np.asarray(fit_X_p3)
+        fit_Y_p3 = np.asarray(fit_Y_p3)
 
         
         
+        if self.type == 1:
+            vigot = LorentzianModel(prefix='v1_')
+            vigot2 = LorentzianModel(prefix='v2_')
+            vigot3 = LorentzianModel(prefix='v3_')
         
         
+        pars_1 = vigot.guess(fit_Y_p1,x = fit_X_p1)
         
+        
+        pars_1['v1_center'].set(high_peak[-1][0], min=high_peak[-1][0]-10, max=high_peak[-1][0]+10)
+        
+        out_1 = vigot.fit(fit_Y_p1,pars_1,x = fit_X_p1)
+        
+        
+
+        
+        pars_2 = vigot2.guess(fit_Y_p2,x = fit_X_p2)
+        
+        pars_2['v2_center'].set(high_peak[0][0], min=high_peak[0][0]-10, max=high_peak[0][0]+10)
+        #pars['v2_sigma'].set(value = 0.2,vary = True,expr = '')
+        
+        
+        out_2 = vigot2.fit(fit_Y_p2,pars_2,x = fit_X_p2)
+        
+        
+
+        
+        pars_3 = vigot3.guess(fit_Y_p3,x = fit_X_p3)
+        
+        pars_3['v3_center'].set(high_peak1[0][0], min=high_peak1[0][0]-10, max=high_peak1[0][0]+10)
+        #pars['v2_sigma'].set(value = 0.2,vary = True,expr = '')
+        
+        
+        out_3 = vigot3.fit(fit_Y_p3,pars_3,x = fit_X_p3)
+        
+        fit_area1 = simps(out_1.best_fit, dx=0.5)
+        fit_area2 = simps(out_2.best_fit, dx=0.5)
+        fit_area3 = simps(out_3.best_fit, dx=0.5)
+        
+        #area.append(str(spec[m[j]].filename) + '\t' + str(fit_area1) + '\t' + str(fit_area2) + '\t' + str(fit_area3) + '\n')
+        
+        
+        #out = mod.fit(spec[0].signal, pars, x=spec[0].shift)
+        print(out_3.fit_report(min_correl=0.25))
+        plt.close()
+        #plt.plot(fit_X,fit_Y,label = self.title  + '\n peaks = ' + str(high_peak[-1][0]) + ' , ' + str(high_peak[0][0]) )
+        plt.plot(fit_X_p1,out_1.best_fit,label = 'peak 1 best fit')
+        plt.plot(fit_X_p2,out_2.best_fit,label = 'peak 2 best fit')
+        plt.plot(fit_X_p3,out_3.best_fit,label = 'peak 3 best fit')
+        plt.show()
+        return fit_area1, fit_area2, fit_area3
+        
+     
         
         
         

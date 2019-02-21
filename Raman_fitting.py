@@ -41,7 +41,7 @@ num = int(input())
 if num == 0:
    cond = 1
 elif num == -1 or num == -11:
-    pre.append(str('p01_'))
+    pre.append(str('p1_'))
 #    pre.append(str('p15_'))
 #    pre.append(str('p16_'))
 #    pre.append(str('p2_'))
@@ -65,9 +65,9 @@ elif num !=0 or num != -1:
         if count+1 == num:
             print('done')
 
-width = 50#int(input('Input the max peak width:\n'))
-n = 2#int(input('Input the number of peaks to fit:\n'))
-fit_type = 1#int(input('Input the fit type:\n 1 = Lorentzian'))
+width = int(input('Input the max peak width:\n'))
+n = int(input('Input the number of peaks to fit:\n'))
+fit_type = int(input('Input the fit type:\n 1 = Lorentzian\n 2 = Voigt\n'))
 #print(cond)
         
 frmt = '1.txt'
@@ -149,14 +149,15 @@ else:
 #    for i in range(len(ruby)):
 #        output.write(ruby[i])
 if sped == '3600':
-    print('input number of peaks to fit: \n')
-    n = 2#int(input())
     save_path = (str(os.getcwd()) + '\\3600cm\\' + sped + '_output data.txt')
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     output = open(save_path,'w')
     output.write('name\t peak_1\t peak_2\t area_1\t area_2\t area_total\t ratio\t fwhm_1\t fwhm_2\n')
     for i in range(len(m)):
-        compound_x,compound_y,peak1_x,peak1_fit,peak2_x,peak2_fit,total_area,area_1,area_2,ratio = fittingV_ver2.Multi_fit.peaks_2(rama[m[i]])
+        if n == 2:
+            compound_x,compound_y,peak1_x,peak1_fit,peak2_x,peak2_fit,total_area,area_1,area_2,ratio = fittingV_ver2.Multi_fit.peaks_2(rama[m[i]])
+        elif n == 3:
+            x,y = fittingV_ver2.Multi_fit.peaks_3(rama[m[i]])
 #    plt.plot(rama[m[0]].x,rama[m[0]].y)
 #    plt.show()
 #    plt.plot(compound_x,compound_y)
@@ -172,12 +173,14 @@ if sped == '3600':
 #    area,ruby = fittingV.Voigtfit.fitV(spec,n,m,rama,sped)
 #    for i in range(len(area)):
 #        output.write(area[i])
-#elif sped == '500':
-#    n = 2#input('input number of peaks to fit: \n')
-#    save_path = (str(os.getcwd()) + '\\500cm\\' + sped + '_output data.txt')
-#    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-#    output = open(save_path,'w')
-#    output.write('name\t area_1\t area_2\t area_total\t ratio\n')
+elif sped == '500':
+#   n = 3#input('input number of peaks to fit: \n')
+    save_path = (str(os.getcwd()) + '\\500cm\\' + sped + '_output data.txt')
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    output = open(save_path,'w')
+    output.write('name\t area_1\t area_2\t area_total\t ratio\n')
+    for i in range(len(m)):
+        x,y,z = fittingV_ver2.Multi_fit.peaks_3(rama[m[i]])
 #    area,ruby = fittingV.Voigtfit.fitV(spec,n,m,rama,sped)
 #    for i in range(len(area)):
 #        output.write(area[i])
