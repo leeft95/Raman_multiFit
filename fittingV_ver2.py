@@ -25,139 +25,103 @@ import scipy.interpolate as sci
 import matplotlib.pyplot as plt
 from scipy.integrate import simps
 import numpy as np
+import pandas as pd
 from lmfit.models import (GaussianModel,LorentzianModel,PseudoVoigtModel,
-VoigtModel)
+VoigtModel, LinearModel)
 
 
 class Multi_fit():
     
-    def __init__(self,shift,signal,title,peaks,peak_width,fit_t):
+    def __init__(self, shift, signal, fit_t, peak_width=5):
         
         self.x = shift
         self.y = signal
-        self.title = title
-        self.num_peaks = peaks
-        self.width = peak_width
         self.type = fit_t
-    
+        self.peak_width = peak_width
+        self.data = pd.DataFrame(dict(Shift=shift, Signal=signal))
+
+    def find_peaks(self):
+        peak_indexes = scipy.signal.find_peaks(self.data['Signal'].to_numpy(), prominence=1, width=self.peak_width)[0]
+        peak_df = self.data.iloc[peak_indexes]
+        return peak_df.sort_values('Signal', ascending=False)
+
+    def peaks_1(self):
+        #Initialise Models
+        if self.type == 1:
+            peak_mod = LorentzianModel(prefix='v1_')
+        elif self.type == 2:
+            peak_mod = VoigtModel(prefix='v1_')
+        else:
+            raise Exception(f'{self.type} is not a selectable option\n')
+        background = LinearModel(prefix = 'back_') #Model to take into account background noise
+
+        #Intial Fit with guessed parameters
+        pars = peak_mod.guess(self.data['Signal'], x = self.data['Shift'])
+        pars.update(background.make_params()) # add the background model
+        model = peak_mod + background 
+        
+        #Running linear regression fit on the data
+        fit = model.fit(self.data['Signal'].values, pars , x = self.data['Shift'].values)
+        fit.plot()[0].savefig('out1.png')
+        fwhm_1 = fit.params['v1_fwhm'].value
+        peak1_pos = fit.params['v1_center'].value
+        area_1 = simps(fit.best_fit, dx=0.5)
+
+        return (dict(
+                raw_x=self.data['Shift'].values,
+                raw_y=self.data['Signal'].values,
+                best_fit=fit.best_fit,
+                peak_pos=peak1_pos,
+                area=area_1,
+                fwhm=fwhm_1
+            ), fit.fit_report(min_correl=0.5))
+
     def peaks_2(self):
         
         if self.type == 1:
-            print('l')
             lor_fit1 = LorentzianModel(prefix = 'v1_')
             lor_fit2 = LorentzianModel(prefix = 'v2_')
-            
         elif self.type == 2:
-            print('v')
             lor_fit1 = VoigtModel(prefix = 'v1_')
             lor_fit2 = VoigtModel(prefix = 'v2_')
-        elif self.type > 3:
-            print(str(self.type) + 'is not a selectable option\n')
-            
-            return 
+        else:
+            raise Exception(f'{self.type} is not a selectable option\n')
+        background = LinearModel(prefix = 'back_')
+        
+        ####_find main peak ####
+        peaks = self.find_peaks()
+        high_peak = peaks.iloc[0]['Shift']
+        second_peak = peaks.iloc[1]['Shift']
 
-        
-        widths = np.arange(1,self.width,0.01)
-        
-        print(self.title)
-        
-        ####_find main peak_####
-        
-        smooth_indexes_scipy = scipy.signal.find_peaks_cwt(self.y, widths)
-        peak_indexes_xs_ys = np.asarray([list(a) for a in list(zip(self.x[smooth_indexes_scipy], self.y[smooth_indexes_scipy]))])
-        high_peak = sorted(peak_indexes_xs_ys, key=lambda pair: pair[1])[-self.num_peaks:]
-        print('\n' + str(high_peak[-1][0]) +  '\n')
-        
-        ####_normalisation lists_####
-        
-        fit_X = []
-        fit_Y = []
-        
-        fit_XX = []
-        fit_YY = []
-        
-        fit_X_p1 = []
-        fit_Y_p1 = []
-        
-        fit_X_p2 = []
-        fit_Y_p2 = []
-        
-        ####_cut down peak search area_####
-        
-        fit_range = 100
-        
-        for i in range(len(self.x)):
-            if self.x[i] > (high_peak[-1][0]-fit_range) and self.x[i] < (high_peak[-1][0]+fit_range):
-                fit_X.append(self.x[i])
-                fit_Y.append(self.y[i])
-        
-        
-        fit_X = np.asarray(fit_X)
-        fit_Y = np.asarray(fit_Y)
-        
-        ####_find second peak in cut down range and normalise data_####
-        
-        smooth_indexes_scipy = scipy.signal.find_peaks_cwt(fit_Y, widths)        
-        peak_indexes_xs_ys = np.asarray([list(a) for a in list(zip(fit_X[smooth_indexes_scipy], fit_Y[smooth_indexes_scipy]))])
-        high_peak2 = sorted(peak_indexes_xs_ys, key=lambda pair: pair[1])[-self.num_peaks:]
-        print(high_peak2)
-    
-        for i in range(len(fit_X)):
-            if fit_X[i] > high_peak[-1][0]-fit_range and fit_X[i] < high_peak[-1][0]+fit_range:
-                x  = (fit_Y[i] - min(fit_Y))/(max(fit_Y) - min(fit_Y))
-                fit_XX.append(fit_X[i])
-                fit_YY.append(x)
-                
-        fit_XX = np.asarray(fit_XX)
-        fit_YY = np.asarray(fit_YY)
-        
-        
+        fit_range = 100 # Default to fit single peak in compound
+
         ####_comopund fit_####
-        
-
-        
-        pars = lor_fit1.guess(fit_YY,x = fit_XX)
-        
-        pars['v1_center'].set(high_peak2[-1][0], min=high_peak[-1][0]-2, max=high_peak2[-1][0]+2)
-    
+        pars = lor_fit1.guess(self.data['Signal'].values, x = self.data['Shift'].values)
+        pars['v1_center'].set(high_peak, min=high_peak-2, max=high_peak+2)
         pars.update(lor_fit2.make_params())
-        
-        pars['v2_center'].set(high_peak2[0][0], min=high_peak2[0][0]-5, max=high_peak2[0][0]+5)
-        
-        compound = lor_fit1 + lor_fit2
-        
-        compound_fit = compound.fit(fit_YY,pars,x = fit_XX)
-        
-        total_area = simps(compound_fit.best_fit,dx =0.5)
-        
-        compound_x  = fit_XX
+        pars['v2_center'].set(second_peak, min=second_peak-2, max=second_peak+2)
+        pars.update(background.make_params())
+        compound = lor_fit1 + lor_fit2 + background
+        compound_fit = compound.fit(self.data['Signal'].values, pars, x = self.data['Shift'].values)
+        compound_fit.plot()[0].savefig('out2.png')
+        total_area = simps(compound_fit.best_fit, dx=0.5)
+        compound_x  = self.data['Shift']
         compound_y  = compound_fit.best_fit
         
-        plt.plot(compound_x,fit_YY,label = 'best fit')
-        plt.plot(compound_x,compound_fit.best_fit,label = 'best fit')
-        
-
         ####_single peak fits_####
+        fit_p1 = self.data[((self.data['Shift'] >  compound_fit.params['v1_center'].value-(fit_range/2)) & (self.data['Shift'] < compound_fit.params['v1_center'].value+(fit_range/2)))]
+        fit_p2 = self.data[((self.data['Shift'] >  compound_fit.params['v2_center'].value-(fit_range/2)) & (self.data['Shift'] < compound_fit.params['v2_center'].value+(fit_range/2)))]
+
+        fit_X_p1 = fit_p1['Shift'].values
+        fit_Y_p1 = fit_p1['Signal'].values
         
-        for i in range(len(fit_XX)):
-            if fit_XX[i] >  compound_fit.params['v1_center'].value-(fit_range/2) and fit_XX[i] <  compound_fit.params['v1_center'].value+(fit_range/2):
-                fit_X_p1.append(fit_XX[i])
-                fit_Y_p1.append(fit_YY[i])
-            if fit_XX[i] >  compound_fit.params['v2_center'].value-(fit_range/2) and fit_XX[i] <  compound_fit.params['v2_center'].value+(fit_range/2):
-                fit_X_p2.append(fit_XX[i])
-                fit_Y_p2.append(fit_YY[i])
-                
-        fit_X_p1 = np.asarray(fit_X_p1)
-        fit_Y_p1 = np.asarray(fit_Y_p1)
-        
-        fit_X_p2 = np.asarray(fit_X_p2)
-        fit_Y_p2 = np.asarray(fit_Y_p2)
+        fit_X_p2 = fit_p2['Shift'].values
+        fit_Y_p2 = fit_p2['Signal'].values
         
         peak1 = lor_fit1.guess(fit_Y_p1,x = fit_X_p1)
         peak2 = lor_fit2.guess(fit_Y_p2,x = fit_X_p2)
         
         peak1['v1_center'].set(compound_fit.params['v1_center'].value, min=compound_fit.params['v1_center'].value-5, max=compound_fit.params['v1_center'].value+5)  
-        
         peak2['v2_center'].set(compound_fit.params['v2_center'].value, min=compound_fit.params['v2_center'].value-5, max=compound_fit.params['v2_center'].value+5)
         peak2['v2_amplitude'].set(value =compound_fit.params['v2_amplitude'].value,vary = False)
         peak2['v2_sigma'].set(value = compound_fit.params['v2_sigma'].value, vary = False)
@@ -168,11 +132,6 @@ class Multi_fit():
         area_1 = simps(peak1_fit.best_fit, dx=0.5)
         area_2 = simps(peak2_fit.best_fit, dx=0.5)
         
-        plt.plot(fit_X_p1,peak1_fit.best_fit)
-        plt.plot(fit_X_p2,peak2_fit.best_fit)
-        plt.title(str(self.title))
-        plt.savefig(str(self.title)+'.png', transparent=True)
-        plt.close()
         ratio = area_1/area_2
         
         peak1_x = fit_X_p1
@@ -184,14 +143,25 @@ class Multi_fit():
         fwhm_1 = peak1_fit.params['v1_fwhm'].value
         fwhm_2 = peak2_fit.params['v2_fwhm'].value
 
-        print(len(peak2_fit.best_fit))
-        print(len(peak1_x))
-
-
-        return compound_x,compound_y,peak1_x,peak1_fit.best_fit,peak2_x,peak2_fit.best_fit,total_area,\
-               area_1,area_2,ratio,peak1_pos,peak2_pos,fwhm_1,fwhm_2
+        return (dict(
+            raw_x=self.data['Shift'].values,
+            raw_y=self.data['Signal'].values,
+            compound_x=compound_x,
+            compound_y=compound_y,
+            peak1_x=fit_X_p1,
+            peak1_bestfit=peak1_fit.best_fit,
+            peak2_x=fit_X_p2,
+            peak2_bestfit=peak2_fit.best_fit,
+            total_area=total_area,
+            area_1=area_1,
+            area_2=area_2,
+            ratio=ratio,
+            peak1_pos=peak1_pos,
+            peak2_pos=peak2_pos,
+            fwhm_1=fwhm_1,
+            fwhm_2=fwhm_2
+            ), compound_fit.fit_report(min_correl=0.5))
             
-           
     def peaks_3(self): 
         
         """
@@ -200,157 +170,103 @@ class Multi_fit():
         """
         
         if self.type == 1:
-            vigot = LorentzianModel(prefix='v1_')
-            vigot2 = LorentzianModel(prefix='v2_')
-            vigot3 = LorentzianModel(prefix='v3_')
+            peak_mod = LorentzianModel(prefix='v1_')
+            peak_mod2 = LorentzianModel(prefix='v2_')
+            peak_mod3 = LorentzianModel(prefix='v3_')
         elif self.type == 2:
-            vigot = VoigtModel(prefix='v1_')
-            vigot2 = VoigtModel(prefix='v2_')
-            vigot3 = VoigtModel(prefix='v3_')
-        elif self.type > 3:
-            print(str(self.type) + 'is not a selectable option\n')
-            
-            return
-        
-        widths=np.arange(1,self.width, 0.001)
-        
-        smooth_indexes_scipy = scipy.signal.find_peaks_cwt(self.y, widths)
-        peak_indexes_xs_ys = np.asarray([list(a) for a in list(zip(self.x[smooth_indexes_scipy], self.y[smooth_indexes_scipy]))])
-        high_peak = sorted(peak_indexes_xs_ys, key=lambda pair: pair[1])[-self.num_peaks:]
-        print('\n' + str(high_peak[-1][0]) + '\n')
-        print(high_peak)
+            peak_mod = VoigtModel(prefix='v1_')
+            peak_mod2 = VoigtModel(prefix='v2_')
+            peak_mod3 = VoigtModel(prefix='v3_')
+        else:
+            raise Exception(f'{self.type} is not a selectable option\n')
 
-        fit_X = []
-        fit_Y = []
-        fit_XX = []
-        fit_YY = []
-        
-        fit_range1 = 500
+        background = LinearModel(prefix = 'back_') #Model to take into account background noise
+        fit_range = 100
+        peaks = self.find_peaks()
 
-        for i in range(len(self.x)):
-            if self.x[i] > high_peak[-1][0]-fit_range1 and self.x[i] < high_peak[-1][0]+fit_range1:
-                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
-                fit_XX.append(self.x[i])
-                fit_YY.append(x)
-                
-        fit_XX = np.asarray(fit_XX)
-        fit_YY = np.asarray(fit_YY)
+        fit_p1 = self.data[((self.data['Shift'] > peaks.iloc[0]['Shift']-(fit_range/2)) & (self.data['Shift'] < peaks.iloc[0]['Shift']+(fit_range/2)))]
+        fit_X_p1 = fit_p1['Shift'].values
+        fit_Y_p1 = fit_p1['Signal'].values
         
-        smooth_indexes_scipy = scipy.signal.find_peaks_cwt(fit_YY, widths)
-        peak_indexes_xs_ys = np.asarray([list(a) for a in list(zip(fit_XX[smooth_indexes_scipy], fit_YY[smooth_indexes_scipy]))])
-        high_peak1 = sorted(peak_indexes_xs_ys, key=lambda pair: pair[1])[-2:]
-        print('\n' + str(high_peak[-1][0]) + '\n')
-        print(peak_indexes_xs_ys)
-        print(high_peak1)
-                
-        fit_range2 = 500
-            
-        for i in range(len(self.x)):
-            if self.x[i] > high_peak[-1][0]-fit_range2 and self.x[i] < high_peak[-1][0]+fit_range2:
-                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
-                fit_X.append(self.x[i])
-                fit_Y.append(x)
+        fit_p2 = self.data[((self.data['Shift'] > peaks.iloc[1]['Shift']-(fit_range/2)) & (self.data['Shift'] < peaks.iloc[1]['Shift']+(fit_range/2)))]
+        fit_X_p2 = fit_p2['Shift'].values
+        fit_Y_p2 = fit_p2['Signal'].values
         
-        fit_X = np.asarray(fit_X)
-        fit_Y = np.asarray(fit_Y)
+        fit_p3 = self.data[((self.data['Shift'] > peaks.iloc[2]['Shift']-(fit_range/2)) & (self.data['Shift'] < peaks.iloc[2]['Shift']+(fit_range/2)))]
+        fit_X_p3 = fit_p3['Shift'].values
+        fit_Y_p3 = fit_p3['Signal'].values
         
+        #Single peak fits
+        pars_1 = pars = peak_mod.guess(fit_Y_p1,x = fit_X_p1)
+        pars_1['v1_center'].set(peaks.iloc[0]['Shift'], min=peaks.iloc[0]['Shift']-2, max=peaks.iloc[0]['Shift']+2)
+        out_1 = peak_mod.fit(fit_Y_p1,pars_1,x = fit_X_p1)
+        out_1.plot()[0].savefig('out3a.png')
         
-        fit_X_p1 = []
-        fit_Y_p1 = []
+        pars_2 = peak_mod2.guess(fit_Y_p2,x = fit_X_p2)
+        pars_2['v2_center'].set(peaks.iloc[1]['Shift'], min=peaks.iloc[1]['Shift']-2, max=peaks.iloc[1]['Shift']+2)
+        out_2 = peak_mod2.fit(fit_Y_p2, pars_2, x = fit_X_p2)
+        out_2.plot()[0].savefig('out3b.png')
         
-        fit_X_p2 = []
-        fit_Y_p2 = []
-        
-        fit_X_p3 = []
-        fit_Y_p3 = []                    
-        
-        for i in range(len(self.x)):
-            if self.x[i] > high_peak1[-1][0]-15 and self.x[i] < high_peak1[-1][0]+15:
-                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
-                fit_X_p1.append(self.x[i])
-                fit_Y_p1.append(x)
-            if self.x[i] > high_peak[0][0]-15 and self.x[i] < high_peak[0][0]+15:
-                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
-                fit_X_p2.append(self.x[i])
-                fit_Y_p2.append(x)
-            if self.x[i] > high_peak1[0][0]-15 and self.x[i] < high_peak1[0][0]+15:
-                x  = (self.y[i] - min(self.y))/(max(self.y) - min(self.y))
-                fit_X_p3.append(self.x[i])
-                fit_Y_p3.append(x)
-            #return fit_X, fit _Y
-        
-        fit_X_p1 = np.asarray(fit_X_p1)
-        fit_Y_p1 = np.asarray(fit_Y_p1)
-        
-        fit_X_p2 = np.asarray(fit_X_p2)
-        fit_Y_p2 = np.asarray(fit_Y_p2)
+        pars_3 = peak_mod3.guess(fit_Y_p3, x = fit_X_p3)
+        pars_3['v3_center'].set(peaks.iloc[2]['Shift'], min=peaks.iloc[2]['Shift']-2, max=peaks.iloc[2]['Shift']+2)
+        out_3 = peak_mod3.fit(fit_Y_p3, pars_3,x = fit_X_p3)
+        out_3.plot()[0].savefig('out3c.png')
 
-        fit_X_p3 = np.asarray(fit_X_p3)
-        fit_Y_p3 = np.asarray(fit_Y_p3)
-
-        
-        
-
-        
-        pars_1 = vigot.guess(fit_Y_p1,x = fit_X_p1)
-        
-        pars_1['v1_center'].set(high_peak[-1][0], min=high_peak[-1][0]-10, max=high_peak[-1][0]+10)
-        
-        out_1 = vigot.fit(fit_Y_p1,pars_1,x = fit_X_p1)
-        
-        
-        pars_2 = vigot2.guess(fit_Y_p2,x = fit_X_p2)
-        
-        pars_2['v2_center'].set(high_peak[0][0], min=high_peak[0][0]-10, max=high_peak[0][0]+10)
-
-        
-        out_2 = vigot2.fit(fit_Y_p2,pars_2,x = fit_X_p2)
-        
-        
-        pars_3 = vigot3.guess(fit_Y_p3,x = fit_X_p3)
-        
-        pars_3['v3_center'].set(high_peak1[0][0], min=high_peak1[0][0]-10, max=high_peak1[0][0]+10)
-
-        
-        out_3 = vigot3.fit(fit_Y_p3,pars_3,x = fit_X_p3)
-        
         fit_area1 = simps(out_1.best_fit, dx=0.5)
         fit_area2 = simps(out_2.best_fit, dx=0.5)
         fit_area3 = simps(out_3.best_fit, dx=0.5)
-
-
-        plt.close()
-        plt.plot(fit_X,fit_Y,label = self.title  + '\n peaks = ' + str(high_peak[-1][0]) + ' , ' + str(high_peak[0][0]) )
-        plt.plot(fit_X_p1,out_1.best_fit,label = 'peak 1 best fit')
-        plt.plot(fit_X_p2,out_2.best_fit,label = 'peak 2 best fit')
-        plt.plot(fit_X_p3,out_3.best_fit,label = 'peak 3 best fit')
-        plt.savefig(str(self.title)+'.png', transparent=True)
-
-        peak_1_fit = out_1.params['v1_center'].value
-        peak_2_fit = out_2.params['v2_center'].value
-        peak_3_fit = out_3.params['v3_center'].value
-
-        compound_xy = (fit_X,fit_Y)
-        fit_xy_1 = (fit_X_p1,out_1.best_fit)
+        
+        fit_xy_1 = (fit_X_p1, out_1.best_fit)
         fit_xy_2 = (fit_X_p2,out_2.best_fit)
         fit_xy_3 = (fit_X_p3,out_3.best_fit)
         fwhm_1 = out_1.params['v1_fwhm'].value
         fwhm_2 = out_2.params['v2_fwhm'].value
         fwhm_3 = out_3.params['v3_fwhm'].value
-
-
-        send_var = (fit_area1, fit_area2, fit_area3 , peak_1_fit, peak_2_fit, peak_3_fit,
-                         compound_xy, fit_xy_1, fit_xy_2, fit_xy_3,fwhm_1,fwhm_2,fwhm_3)
-
-        return send_var
-    
-    def peaks_1(self):
         
-        return None
-    
-    def waterfall(self):
+        peak_1_fit = out_1.params['v1_center'].value
+        peak_2_fit = out_2.params['v2_center'].value
+        peak_3_fit = out_3.params['v3_center'].value
+
+        #compound fit
+        pars['v1_center'].set(peaks.iloc[0]['Shift'], min=peaks.iloc[0]['Shift']-2, max=peaks.iloc[0]['Shift']+2)
+        pars.update(peak_mod2.make_params())
+        pars['v2_center'].set(peaks.iloc[1]['Shift'], min=peaks.iloc[1]['Shift']-2, max=peaks.iloc[1]['Shift']+2)
+        pars.update(peak_mod3.make_params())
+        pars['v3_center'].set(peaks.iloc[2]['Shift'], min=peaks.iloc[2]['Shift']-2, max=peaks.iloc[2]['Shift']+2)
+        pars.update(background.make_params())
+        compound = peak_mod + peak_mod2 + peak_mod3 + background
+        compound_fit = compound.fit(self.data['Signal'].values, pars,x = self.data['Shift'].values)
+
+        total_area = simps(compound_fit.best_fit, dx=0.5)
+        compound_x  = self.data['Shift']
+        compound_y  = compound_fit.best_fit
+        compound_fit.plot()[0].savefig('out3.png')
         
-        return None
+        return (dict(
+            raw_x=self.data['Shift'].values,
+            raw_y=self.data['Signal'].values,
+            compound_x=compound_x,
+            compound_y=compound_y,
+            peak1_x=fit_xy_1[0],
+            peak1_bestfit=fit_xy_1[1],
+            peak2_x=fit_xy_2[0],
+            peak2_bestfit=fit_xy_2[1],
+            peak3_x=fit_xy_3[0],
+            peak3_bestfit=fit_xy_3[1],
+            total_area=total_area,
+            area_1=fit_area1,
+            area_2=fit_area2,
+            area_3=fit_area3,
+            peak1_pos=peak_1_fit,
+            peak2_pos=peak_2_fit,
+            peak3_pos=peak_3_fit,
+            fwhm_1=fwhm_1,
+            fwhm_2=fwhm_2,
+            fwhm_3=fwhm_3,
+            ), compound_fit.fit_report(min_correl=0.5))
+    
+ 
+        
         
      
         
