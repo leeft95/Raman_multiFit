@@ -312,4 +312,4 @@ elif fit_t == 3:
         )
         sum_data_to_write.index.name = "data_set_file_name"
         summary.append(sum_data_to_write)
-    pd.concat(summary).to_csv(data_path / "fitting_summary_double_peak_fit.csv")
+    pd.concat(summary).to_csv(data_path / "fitting_summary_triple_peak_fit.csv")
