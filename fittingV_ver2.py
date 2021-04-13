@@ -91,7 +91,6 @@ class Multi_fit:
         pars.update(background.make_params())
         compound = lor_fit1 + lor_fit2 + background
         compound_fit = compound.fit(self.data["Signal"].values, pars, x=self.data["Shift"].values)
-        compound_fit.plot()[0].savefig("out2.png")
         total_area = simps(compound_fit.best_fit, dx=0.5)
         compound_x = self.data["Shift"]
         compound_y = compound_fit.best_fit
@@ -117,7 +116,9 @@ class Multi_fit:
         fit_Y_p2 = fit_p2["Signal"].values
 
         peak1 = lor_fit1.guess(fit_Y_p1, x=fit_X_p1)
+        peak1.update(background.make_params())
         peak2 = lor_fit2.guess(fit_Y_p2, x=fit_X_p2)
+        peak2.update(background.make_params())
 
         peak1["v1_center"].set(
             compound_fit.params["v1_center"].value,
@@ -131,9 +132,10 @@ class Multi_fit:
         )
         peak2["v2_amplitude"].set(value=compound_fit.params["v2_amplitude"].value, vary=False)
         peak2["v2_sigma"].set(value=compound_fit.params["v2_sigma"].value, vary=False)
-
-        peak1_fit = lor_fit1.fit(fit_Y_p1, peak1, x=fit_X_p1)
-        peak2_fit = lor_fit2.fit(fit_Y_p2, peak2, x=fit_X_p2)
+        mod_peak1 = lor_fit1 + background
+        mod_peak2 = lor_fit2 + background
+        peak1_fit = mod_peak1.fit(fit_Y_p1, peak1, x=fit_X_p1)
+        peak2_fit = mod_peak2.fit(fit_Y_p2, peak2, x=fit_X_p2)
 
         area_1 = simps(peak1_fit.best_fit, dx=0.5)
         area_2 = simps(peak2_fit.best_fit, dx=0.5)
@@ -219,24 +221,29 @@ class Multi_fit:
 
         # Single peak fits
         pars_1 = pars = peak_mod.guess(fit_Y_p1, x=fit_X_p1)
+        pars_1.update(background.make_params())
+        mod_peak1 = peak_mod + background
         pars_1["v1_center"].set(
             peaks.iloc[0]["Shift"], min=peaks.iloc[0]["Shift"] - 2, max=peaks.iloc[0]["Shift"] + 2
         )
-        out_1 = peak_mod.fit(fit_Y_p1, pars_1, x=fit_X_p1)
-        out_1.plot()[0].savefig("out3a.png")
+        out_1 = mod_peak1.fit(fit_Y_p1, pars_1, x=fit_X_p1)
 
         pars_2 = peak_mod2.guess(fit_Y_p2, x=fit_X_p2)
+        pars_2.update(background.make_params())
+        mod_peak2 = peak_mod2 + background
         pars_2["v2_center"].set(
             peaks.iloc[1]["Shift"], min=peaks.iloc[1]["Shift"] - 2, max=peaks.iloc[1]["Shift"] + 2
         )
-        out_2 = peak_mod2.fit(fit_Y_p2, pars_2, x=fit_X_p2)
+        out_2 = mod_peak2.fit(fit_Y_p2, pars_2, x=fit_X_p2)
         out_2.plot()[0].savefig("out3b.png")
 
         pars_3 = peak_mod3.guess(fit_Y_p3, x=fit_X_p3)
+        pars_3.update(background.make_params())
+        mod_peak3 = peak_mod3 + background
         pars_3["v3_center"].set(
             peaks.iloc[2]["Shift"], min=peaks.iloc[2]["Shift"] - 2, max=peaks.iloc[2]["Shift"] + 2
         )
-        out_3 = peak_mod3.fit(fit_Y_p3, pars_3, x=fit_X_p3)
+        out_3 = mod_peak3.fit(fit_Y_p3, pars_3, x=fit_X_p3)
         out_3.plot()[0].savefig("out3c.png")
 
         fit_area1 = simps(out_1.best_fit, dx=0.5)
