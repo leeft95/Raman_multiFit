@@ -14,7 +14,7 @@ import pandas as pd
 import fittingV_ver2
 
 """
-Dependency: lmfit,numpy,scipy,matplotlib
+Dependency: lmfit, numpy, scipy, matplotlib, pandas
 """
 
 # Dummy parameters
