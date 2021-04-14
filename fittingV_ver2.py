@@ -47,7 +47,6 @@ class Multi_fit:
 
         # Running linear regression fit on the data
         fit = model.fit(self.data["Signal"].values, pars, x=self.data["Shift"].values)
-        fit.plot()[0].savefig("out1.png")
         fwhm_1 = fit.params["v1_fwhm"].value
         peak1_pos = fit.params["v1_center"].value
         area_1 = simps(fit.best_fit, dx=0.5)
@@ -235,7 +234,6 @@ class Multi_fit:
             peaks.iloc[1]["Shift"], min=peaks.iloc[1]["Shift"] - 2, max=peaks.iloc[1]["Shift"] + 2
         )
         out_2 = mod_peak2.fit(fit_Y_p2, pars_2, x=fit_X_p2)
-        out_2.plot()[0].savefig("out3b.png")
 
         pars_3 = peak_mod3.guess(fit_Y_p3, x=fit_X_p3)
         pars_3.update(background.make_params())
@@ -244,7 +242,6 @@ class Multi_fit:
             peaks.iloc[2]["Shift"], min=peaks.iloc[2]["Shift"] - 2, max=peaks.iloc[2]["Shift"] + 2
         )
         out_3 = mod_peak3.fit(fit_Y_p3, pars_3, x=fit_X_p3)
-        out_3.plot()[0].savefig("out3c.png")
 
         fit_area1 = simps(out_1.best_fit, dx=0.5)
         fit_area2 = simps(out_2.best_fit, dx=0.5)
@@ -280,7 +277,6 @@ class Multi_fit:
         total_area = simps(compound_fit.best_fit, dx=0.5)
         compound_x = self.data["Shift"]
         compound_y = compound_fit.best_fit
-        compound_fit.plot()[0].savefig("out3.png")
 
         return (
             dict(
