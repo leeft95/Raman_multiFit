@@ -73,7 +73,19 @@ def main():
         except ValueError:
             print("please select a valid option")
 
-    widths = 5
+    while True:
+        try:
+            widths = int(
+                input(
+                    "peak width to use in peak search algo, usually 4-6 works best\n"
+                )
+            )
+            if not isinstance(widths, int):
+                raise ValueError
+            else:
+                break
+        except ValueError:
+            print("please input a valid width")
 
     while True:
         try:

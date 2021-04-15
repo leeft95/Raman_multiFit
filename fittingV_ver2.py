@@ -129,8 +129,8 @@ class Multi_fit:
             min=compound_fit.params["v2_center"].value - 5,
             max=compound_fit.params["v2_center"].value + 5,
         )
-        peak2["v2_amplitude"].set(value=compound_fit.params["v2_amplitude"].value, vary=False)
-        peak2["v2_sigma"].set(value=compound_fit.params["v2_sigma"].value, vary=False)
+        peak2["v2_amplitude"].set(value=compound_fit.params["v2_amplitude"].value, vary=True)
+        peak2["v2_sigma"].set(value=compound_fit.params["v2_sigma"].value, vary=True)
         mod_peak1 = lor_fit1 + background
         mod_peak2 = lor_fit2 + background
         peak1_fit = mod_peak1.fit(fit_Y_p1, peak1, x=fit_X_p1)
