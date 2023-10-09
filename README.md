@@ -12,4 +12,4 @@ format of input_file.dat three columns of index, shift, signal. No headers just 
 0 1234 5678
 
 Usage:
-Download RamanFittingProgram.zip found in the dist folder and extract contents. Run the .exe and follow the promts.
+Download RamanFittingProgram.zip found in the [releases](https://github.com/leeft95/Raman_multiFit/releases/tag/v0.0.2). Run the .exe and follow the promts.
